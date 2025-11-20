@@ -25,10 +25,6 @@ if not TARGET_IP:
     print("❌ Errore: TARGET_IP non trovato nel file .env")
     sys.exit(1)
 
-OUTPUT_RAW = "captured_packets_raw.json"
-OUTPUT_REASSEMBLED = "reassembled_payloads.json"
-OUTPUT_INVESTIGATION = "investigation_packets.json"
-
 # =============================
 #   STATO GLOBALE
 # =============================
@@ -78,6 +74,9 @@ def handle_packet(packet):
     pkt = CapturedPacket(timestamp, src, dst, sport, dport, protocol, data_str)
     PACKET_STORE.append(pkt)
 
+    # Stampa a video ricezione
+    print(f"📦 [{timestamp[-15:]}] RX {src}:{sport} -> {len(data_str)} bytes")
+
     # Gestione Investigazione
     with INVESTIGATION_LOCK:
         if INVESTIGATION_MODE:
@@ -95,23 +94,47 @@ def handle_packet(packet):
 #   SALVATAGGIO FILE
 # =============================
 
+def ensure_directories():
+    base = "captured_data"
+    subdirs = ["raw", "investigation", "reassembled"]
+    
+    if not os.path.exists(base):
+        os.makedirs(base)
+        
+    for sd in subdirs:
+        path = os.path.join(base, sd)
+        if not os.path.exists(path):
+            os.makedirs(path)
+    return base
+
+def get_timestamp():
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
 def save_all_data():
     print("\n💾 Salvataggio dati in corso...")
+    base_dir = ensure_directories()
+    ts = get_timestamp()
     
     # Salva RAW
-    with open(OUTPUT_RAW, "w", encoding="utf-8") as f:
+    path_raw = os.path.join(base_dir, "raw", f"captured_raw_{ts}.json")
+    with open(path_raw, "w", encoding="utf-8") as f:
         json.dump([p.to_dict() for p in PACKET_STORE], f, indent=4)
     
     # Salva RICOSTRUITI
-    with open(OUTPUT_REASSEMBLED, "w", encoding="utf-8") as f:
+    path_reass = os.path.join(base_dir, "reassembled", f"reassembled_{ts}.json")
+    with open(path_reass, "w", encoding="utf-8") as f:
         json.dump(REASSEMBLED_MESSAGES, f, indent=4)
         
-    print(f"✅ Dati salvati: {len(PACKET_STORE)} raw, {len(REASSEMBLED_MESSAGES)} ricostruiti.")
+    print(f"✅ Dati salvati in '{base_dir}':\n   - {path_raw}\n   - {path_reass}")
 
 def save_investigation():
-    with open(OUTPUT_INVESTIGATION, "w", encoding="utf-8") as f:
+    base_dir = ensure_directories()
+    ts = get_timestamp()
+    path_inv = os.path.join(base_dir, "investigation", f"investigation_{ts}.json")
+    
+    with open(path_inv, "w", encoding="utf-8") as f:
         json.dump([p.to_dict() for p in INVESTIGATION_PACKETS], f, indent=4)
-    print(f"🔍 Investigazione salvata in {OUTPUT_INVESTIGATION}")
+    print(f"🔍 Investigazione salvata in {path_inv}")
 
 # =============================
 #   INTERAZIONE UTENTE
