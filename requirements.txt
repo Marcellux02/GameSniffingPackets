@@ -1,0 +1,7 @@
+flask
+requests
+mitmproxy
+scapy
+keyboard
+pyautogui
+python-dotenv
