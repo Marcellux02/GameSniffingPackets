@@ -19,6 +19,8 @@ from packet_logic import CapturedPacket, StreamReassembler
 #   CONFIGURAZIONE
 # =============================
 TARGET_IP = os.getenv("TARGET_IP")
+TARGET_PORT = os.getenv("TARGET_PORT")
+
 if not TARGET_IP:
     print("❌ Errore: TARGET_IP non trovato nel file .env")
     sys.exit(1)
@@ -145,6 +147,13 @@ def trigger_investigation():
 
 if __name__ == "__main__":
     print(f"🚀 Sniffer attivo su {TARGET_IP}")
+    
+    # Costruzione filtro
+    sniff_filter = f"tcp and host {TARGET_IP}"
+    if TARGET_PORT:
+        sniff_filter += f" and port {TARGET_PORT}"
+        print(f"🎯 Filtro porta attivo: {TARGET_PORT}")
+
     print("CMD: [CTRL+C] Stop & Save | [CTRL+M] Click & Investigate")
 
     try:
@@ -153,7 +162,7 @@ if __name__ == "__main__":
         print("⚠️ Libreria 'keyboard' non trovata (pip install keyboard)")
 
     sniffer = AsyncSniffer(
-        filter=f"tcp and host {TARGET_IP}",
+        filter=sniff_filter,
         prn=handle_packet,
         store=False
     )
