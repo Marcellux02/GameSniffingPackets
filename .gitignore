@@ -5,3 +5,4 @@ __pycache__/
 ponte.py
 server.py
 captured_data/
+processed_data/
