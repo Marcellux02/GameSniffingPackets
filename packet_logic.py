@@ -110,9 +110,4 @@ class StreamReassembler:
                 # Avanziamo di 1 char per riprovare a cercare dalla prossima graffa
                 self.buffer = self.buffer[start_index + 1:]
         
-        # Se abbiamo trovato qualcosa, ritorniamo l'ultimo o la lista (modifica il main per gestire liste se vuoi)
-        # Per compatibilità col tuo main attuale, ritorniamo l'ultimo trovato, 
-        # ma l'ideale sarebbe che il main gestisse una lista.
-        if results:
-            return results[-1] # Ritorna l'ultimo successo per ora
-        return None
+        return results

@@ -36,7 +36,8 @@ INVESTIGATION_MODE = False
 INVESTIGATION_LOCK = threading.Lock()
 
 # Istanza del reassembler (dal file esterno)
-reassembler = StreamReassembler()
+reassembler_in = StreamReassembler()  # Traffico IN (Server -> Client)
+reassembler_out = StreamReassembler() # Traffico OUT (Client -> Server)
 
 # =============================
 #   LOGICA SNIFFER
@@ -75,20 +76,62 @@ def handle_packet(packet):
     PACKET_STORE.append(pkt)
 
     # Stampa a video ricezione
-    print(f"📦 [{timestamp[-15:]}] RX {src}:{sport} -> {len(data_str)} bytes")
+    direction_arrow = "->"
+    if src == TARGET_IP:
+        direction_arrow = "<-" # IN
+    
+    print(f"📦 [{timestamp[-15:]}] {src}:{sport} {direction_arrow} {dst}:{dport} | {len(data_str)} bytes")
 
     # Gestione Investigazione
     with INVESTIGATION_LOCK:
         if INVESTIGATION_MODE:
             INVESTIGATION_PACKETS.append(pkt)
 
-    # 2. Logica Reassembling (Solo traffico in entrata dal server)
+    # 2. Logica Reassembling (Bidirezionale)
+    json_results = []
+    direction_label = ""
+
     if src == TARGET_IP:
-        json_result = reassembler.add_fragment(data_str, timestamp)
-        if json_result:
-            size = len(str(json_result['payload']))
-            print(f"🧩 [JSON RICOSTRUITO] Dimensione: {size} chars")
-            REASSEMBLED_MESSAGES.append(json_result)
+        # Traffico in ENTRATA (Server -> Noi)
+        json_results = reassembler_in.add_fragment(data_str, timestamp)
+        direction_label = "IN"
+    elif dst == TARGET_IP:
+        # Traffico in USCITA (Noi -> Server)
+        json_results = reassembler_out.add_fragment(data_str, timestamp)
+        direction_label = "OUT"
+
+    if json_results:
+        # StreamReassembler ora ritorna una LISTA di oggetti (vedi packet_logic.py modificato se necessario, 
+        # ma attualmente ritorna una lista nel metodo process_buffer, ma add_fragment ritorna il risultato di process_buffer)
+        # Controllo packet_logic.py: add_fragment ritorna process_buffer() che ritorna results (lista).
+        
+        # Nota: nel codice originale add_fragment ritornava il risultato di process_buffer.
+        # Ma nel codice originale process_buffer ritornava una lista?
+        # Rileggendo packet_logic.py:
+        # results = [] ... results.append(...) ... return results
+        # Quindi add_fragment ritorna una LISTA.
+        
+        # Tuttavia nel vecchio sniffer_main.py c'era:
+        # json_result = reassembler.add_fragment(data_str, timestamp)
+        # if json_result:
+        #    size = len(str(json_result['payload'])) ...
+        
+        # Questo suggerisce che packet_logic.py ritornasse un singolo oggetto o che il vecchio codice fosse buggato se ne arrivavano più di uno.
+        # Rileggendo packet_logic.py fornito nel contesto:
+        # def process_buffer(self): ... return results (che è una lista)
+        
+        # Quindi il vecchio codice:
+        # if json_result: (se la lista non è vuota)
+        #    size = len(str(json_result['payload'])) -> ERRORE! json_result è una lista!
+        
+        # Probabilmente il vecchio codice intendeva gestire un solo pacchetto o packet_logic è cambiato.
+        # Adatterò il codice per gestire una lista.
+
+        for res in json_results:
+            res['direction'] = direction_label
+            size = len(str(res['payload']))
+            print(f"🧩 [JSON {direction_label}] Dimensione: {size} chars")
+            REASSEMBLED_MESSAGES.append(res)
 
 # =============================
 #   SALVATAGGIO FILE
@@ -111,6 +154,10 @@ def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 def save_all_data():
+    if not PACKET_STORE:
+        print("\n⚠️  Nessun dato catturato. Nessun file salvato.")
+        return
+
     print("\n💾 Salvataggio dati in corso...")
     base_dir = ensure_directories()
     ts = get_timestamp()
@@ -197,6 +244,11 @@ if __name__ == "__main__":
             
     except KeyboardInterrupt:
         print("\n🛑 Arresto richiesto...")
-        sniffer.stop()
+        try:
+            if sniffer.running:
+                sniffer.stop()
+        except Exception as e:
+            print(f"⚠️ Warning durante lo stop dello sniffer: {e}")
+            
         save_all_data()
         sys.exit(0)
