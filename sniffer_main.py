@@ -31,6 +31,7 @@ if not TARGET_IP:
 PACKET_STORE = []
 REASSEMBLED_MESSAGES = []
 INVESTIGATION_PACKETS = []
+INVESTIGATION_MESSAGES = []  # Messaggi JSON ricostruiti durante investigazione
 
 INVESTIGATION_MODE = False
 INVESTIGATION_LOCK = threading.Lock()
@@ -132,6 +133,11 @@ def handle_packet(packet):
             size = len(str(res['payload']))
             print(f"🧩 [JSON {direction_label}] Dimensione: {size} chars")
             REASSEMBLED_MESSAGES.append(res)
+            
+            # Se siamo in modalità investigazione, salva anche lì
+            with INVESTIGATION_LOCK:
+                if INVESTIGATION_MODE:
+                    INVESTIGATION_MESSAGES.append(res)
 
 # =============================
 #   SALVATAGGIO FILE
@@ -175,20 +181,24 @@ def save_all_data():
     print(f"✅ Dati salvati in '{base_dir}':\n   - {path_raw}\n   - {path_reass}")
 
 def save_investigation():
+    if not INVESTIGATION_MESSAGES:
+        print("⚠️  Nessun messaggio JSON catturato durante l'investigazione.")
+        return
+        
     base_dir = ensure_directories()
     ts = get_timestamp()
     path_inv = os.path.join(base_dir, "investigation", f"investigation_{ts}.json")
     
     with open(path_inv, "w", encoding="utf-8") as f:
-        json.dump([p.to_dict() for p in INVESTIGATION_PACKETS], f, indent=4)
-    print(f"🔍 Investigazione salvata in {path_inv}")
+        json.dump(INVESTIGATION_MESSAGES, f, indent=4)
+    print(f"🔍 Investigazione salvata in {path_inv} ({len(INVESTIGATION_MESSAGES)} messaggi)")
 
 # =============================
 #   INTERAZIONE UTENTE
 # =============================
 
 def run_investigation():
-    global INVESTIGATION_MODE, INVESTIGATION_PACKETS
+    global INVESTIGATION_MODE, INVESTIGATION_PACKETS, INVESTIGATION_MESSAGES
     print("\n🔬 INVESTIGAZIONE AVVIATA (Click tra 5s)...")
     time.sleep(5)
     
@@ -197,6 +207,7 @@ def run_investigation():
     
     with INVESTIGATION_LOCK:
         INVESTIGATION_PACKETS = []
+        INVESTIGATION_MESSAGES = []  # Resetta anche i messaggi JSON
         INVESTIGATION_MODE = True
     
     time.sleep(0.5) # Cattura per 0.5s dopo il click

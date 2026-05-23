@@ -1,9 +1,23 @@
-venv/
+# Python
 __pycache__/
-.vscode/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# Environment Variables
 .env
-ponte.py
-server.py
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+.claude
+CLAUDE.md
+
+# Project Specific Data
 captured_data/
 processed_data/

@@ -1,47 +1,74 @@
 # Empire4Kingdoms Protocol Sniffer & Analyzer
 
-Questo progetto contiene un set di strumenti per intercettare, analizzare e decodificare il traffico di rete dell'applicazione mobile "Empire: Four Kingdoms".
+A robust set of Python tools designed to intercept, analyze, and decode the network traffic of the mobile application **"Empire: Four Kingdoms"**. It leverages custom TCP stream reassembly to accurately reconstruct fragmented JSON payloads on the fly.
 
-## Struttura del Progetto
+## Project Overview
 
-### 1. `sniffer_main.py`
-È lo script principale per l'intercettazione del traffico.
-- **Funzione**: Utilizza `scapy` per ascoltare i pacchetti TCP/UDP scambiati con il server di gioco.
-- **Configurazione**: Legge `TARGET_IP` e `TARGET_PORT` dal file `.env`.
-- **Funzionalità**:
-    - Cattura i pacchetti grezzi.
-    - Ricostruisce i messaggi JSON frammentati (Reassembling) utilizzando la logica definita in `packet_logic.py`.
-    - Salva i dati catturati in `captured_data/raw` (pacchetti singoli) e `captured_data/reassembled` (messaggi JSON completi).
-    - **Modalità Investigazione**: Premendo `CTRL+M`, simula un click ed esegue una cattura mirata per breve tempo, utile per isolare eventi specifici.
+This toolset acts as a specialized packet sniffer tailored for reverse-engineering game protocols. Since game data (like commander attributes, inventory, and gems) is often transmitted via fragmented JSON structures over raw TCP sockets, standard tools struggle to parse it correctly. This project solves that by capturing the raw TCP traffic using `scapy` and utilizing a custom brace-counting algorithm to reassemble and extract complete, valid JSON objects from the stream.
 
-### 2. `packet_logic.py`
-Contiene la logica core per la gestione dei pacchetti.
-- **`CapturedPacket`**: Classe che definisce la struttura di un singolo pacchetto catturato (timestamp, sorgente, destinazione, dati grezzi).
-- **`StreamReassembler`**: Classe fondamentale che gestisce il flusso di dati TCP. Poiché i messaggi JSON possono essere frammentati su più pacchetti TCP o più messaggi possono essere in un singolo pacchetto, questa classe accumula i dati in un buffer e utilizza un algoritmo di conteggio delle parentesi graffe per estrarre oggetti JSON validi e completi.
+## Key Features
 
-### 3. `decode_json.py`
-Script per l'analisi e la decodifica dei dati JSON catturati (offline).
-- **Funzione**: Legge i file JSON esportati e cerca di interpretare le strutture dati del gioco (es. inventario, equipaggiamento, gemme).
-- **Mapping**: Utilizza `effect_map.json` per tradurre gli ID numerici degli effetti in nomi leggibili (es. "Forza Mischia").
-- **Output**: Genera file JSON processati nella cartella `processed_data`.
+- **Real-Time Traffic Interception**: Monitors TCP/UDP packets specifically exchanged with the target game server using `scapy`.
+- **Intelligent Stream Reassembly**: Transparently handles packet fragmentation across TCP streams via a custom brace-counting algorithm (`StreamReassembler`), outputting perfect JSON objects.
+- **Investigation Mode**: Bind a hotkey (`CTRL+M`) to simulate a mouse click and isolate the exact network packets corresponding to a specific UI action in the game.
+- **Offline Data Decoding**: Automatically parses the captured JSON dumps to decode complex game structures, such as commanders, bailiffs, and equipment, mapping numerical IDs to human-readable effects.
 
-### 4. `effect_map.json`
-File di mappatura che associa gli ID degli effetti del gioco alle loro descrizioni testuali.
+## Technologies Used
 
-## Come usare
+- **Python 3.x**
+- **Scapy**: For low-level packet capture and filtering.
+- **python-dotenv**: For secure configuration management.
+- **keyboard / pyautogui**: For the hotkey-driven investigation mode.
 
-1. **Configurazione**:
-   - Assicurati di avere un file `.env` con `TARGET_IP` e `TARGET_PORT` corretti.
-   
-2. **Sniffing**:
-   - Esegui `python sniffer_main.py`.
-   - Il programma inizierà a catturare il traffico.
-   - Usa `CTRL+M` per la modalità investigazione se necessario.
-   - Usa `CTRL+C` per fermare la cattura e salvare i dati.
+## Architecture & Components
 
-3. **Analisi**:
-   - I dati salvati si trovano in `captured_data/`.
-   - Puoi usare `decode_json.py` (o script personalizzati) per analizzare i file JSON ricostruiti.
+- `sniffer_main.py`: The core entry point. Configures the sniffer, handles live packet capture, pushes data to the reassembler, and writes the output.
+- `packet_logic.py`: Contains the protocol logic. The `StreamReassembler` buffers the TCP stream and extracts complete JSON payloads, managing bidirectional traffic.
+- `decode_json.py`: An offline analysis script that interprets the reconstructed JSON data. It maps numerical game identifiers to readable text using the configuration.
+- `effect_map.json`: A configuration mapping file that translates in-game effect IDs into descriptive text (e.g., "Melee Strength").
+- `docs/`: Contains additional research and notes regarding mobile app reverse engineering and the game protocol.
 
-## Requisiti
-Vedi `requirements.txt` per le dipendenze Python necessarie (es. `scapy`, `python-dotenv`, `keyboard`, `pyautogui`).
+## Setup & Installation
+
+### 1. Clone and Prepare
+Ensure you have Python 3 installed. Clone the repository and navigate to the root directory.
+
+### 2. Install Dependencies
+It is recommended to use a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 3. Configuration
+Create a `.env` file in the root directory based on `.env.example` (if available) or create one with the following required variables:
+```env
+TARGET_IP=52.50.192.178
+TARGET_PORT=443
+```
+*(Note: Replace with the actual IP/Port of the game server if it has changed).*
+
+## Usage Guide
+
+1. **Start the Sniffer**:
+   Run the main script with administrator/root privileges (required for `scapy` to capture packets):
+   ```bash
+   python sniffer_main.py
+   ```
+2. **Monitor Traffic**: 
+   The application will begin capturing and reassembling packets. Data will be saved automatically to the `captured_data/` directory.
+3. **Investigation Mode**:
+   Press `CTRL+M` to trigger a targeted capture. The script will wait 5 seconds, simulate a click, and isolate the resulting packets.
+4. **Stop & Save**:
+   Press `CTRL+C` to gracefully terminate the sniffer and flush all buffers to disk.
+5. **Analyze the Dump**:
+   Run the decoder to process the captured JSON files:
+   ```bash
+   python decode_json.py
+   ```
+   Parsed data will be exported to the `processed_data/` directory.
+
+## Disclaimer
+
+This project is intended for educational purposes, protocol analysis, and personal research only.
