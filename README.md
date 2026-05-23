@@ -22,9 +22,12 @@ This toolset acts as a specialized packet sniffer tailored for reverse-engineeri
 
 ## Architecture & Components
 
-- `sniffer_main.py`: The core entry point. Configures the sniffer, handles live packet capture, pushes data to the reassembler, and writes the output.
-- `packet_logic.py`: Contains the protocol logic. The `StreamReassembler` buffers the TCP stream and extracts complete JSON payloads, managing bidirectional traffic.
-- `decode_json.py`: An offline analysis script that interprets the reconstructed JSON data. It maps numerical game identifiers to readable text using the configuration.
+- `main.py`: The CLI orchestrator. It provides a unified interface to run all project modules without calling individual scripts manually.
+- `src/`: Contains the core logic scripts:
+  - `sniffer_main.py`: Configures the sniffer, handles live packet capture, and pushes data to the reassembler.
+  - `packet_logic.py`: Contains the protocol logic and the `StreamReassembler`.
+  - `decode_json.py`: An offline analysis script that interprets the reconstructed JSON data.
+  - `find_game_ip.py`: A utility to monitor active network connections and automatically identify the target game server IP.
 - `effect_map.json`: A configuration mapping file that translates in-game effect IDs into descriptive text (e.g., "Melee Strength").
 - `docs/`: Contains additional research and notes regarding mobile app reverse engineering and the game protocol.
 
@@ -51,21 +54,29 @@ TARGET_PORT=443
 
 ## Usage Guide
 
-1. **Start the Sniffer**:
-   Run the main script with administrator/root privileges (required for `scapy` to capture packets):
+The project uses a unified CLI orchestrator (`main.py`) to run all commands. You must execute commands from the project root.
+
+1. **Find Game IP (Optional)**:
+   If you don't know the server IP, you can use the built-in network monitor:
    ```bash
-   python sniffer_main.py
+   python main.py find-ip
    ```
-2. **Monitor Traffic**: 
+
+2. **Start the Sniffer**:
+   Run the CLI with administrator/root privileges (required for `scapy` to capture packets):
+   ```bash
+   python main.py sniff
+   ```
+3. **Monitor Traffic**: 
    The application will begin capturing and reassembling packets. Data will be saved automatically to the `captured_data/` directory.
-3. **Investigation Mode**:
+4. **Investigation Mode**:
    Press `CTRL+M` to trigger a targeted capture. The script will wait 5 seconds, simulate a click, and isolate the resulting packets.
-4. **Stop & Save**:
+5. **Stop & Save**:
    Press `CTRL+C` to gracefully terminate the sniffer and flush all buffers to disk.
-5. **Analyze the Dump**:
+6. **Analyze the Dump**:
    Run the decoder to process the captured JSON files:
    ```bash
-   python decode_json.py
+   python main.py decode
    ```
    Parsed data will be exported to the `processed_data/` directory.
 
